@@ -1,0 +1,404 @@
+\documentclass{article}
+\usepackage{fix-cm}
+\usepackage{url}
+\usepackage{lmodern}
+\usepackage[left=2cm,top=3cm,right=2cm,bottom=3cm]{geometry}
+\usepackage{graphicx}
+\usepackage{ctex}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{setspace}
+
+\renewcommand{\qedsymbol}{Q.E.D.}
+\title{How to Teach Your Cat DDPM}
+\usepackage{titling}
+\pretitle{\begin{center}\Huge}
+\posttitle{\par\end{center}\vskip 0.5em}
+\preauthor{\begin{center}\large}
+\postauthor{\end{center}}
+\predate{\begin{center}\large}
+\postdate{\par\end{center}}
+\title{How to Teach Your Cat DDPM\\\large With Basic Mathematical Statistics}
+\author{Catman Jr.}
+\date{December 24, 2024}
+\begin{document}
+\maketitle
+\section*{Introduction}
+    \qquad As you can see, this is actually a note from my DDPM learning process. The beginning of everything comes from a piece of knowledge article, 
+    the blogger is 撒旦-cc, on Zhihu. You may find that the structure of this note is very similar to that of the original blog. I did 'reproduce' the famous Understanding Diffusion Models: A Unified Perspective, 
+    so I do not consider this article to be my original work. However, when I type my manuscript into latex, I combined the relevant lecture of Prof. Hung-Yi Lee and some contents of the original paper, 
+    and independently restored some derivation details and background knowledge omitted from the paper. Therefore, I named the article "How to Teach Your Cat DDPM". 
+    I hope my notes will be of considerable help to any non-math major who has only basic knowledge of calculus, linear algebra, and mathematical statistics (stochastic process).\\
+
+    \qquad The denoising diffusion probability model is a generative framework that relies on the progressive removal of noise from images. 
+    This model is grounded in the concept of a diffusion process, wherein noise is incrementally removed from an image over time. The architecture of this model comprises two key processes: 
+    a forward process, during which noise is systematically introduced into the image to generate training samples, and a reverse process, where noise is progressively eliminated to reconstruct the original image.
+    In the original paper, the model is trained by optimizing a loss function that evaluates the quality of noise rather than directly assessing pixel-wise differences within the image. 
+    At the conclusion of this section, the original authors introduce two core algorithms. 
+    Therefore, it is essential to understand the step-by-step mechanism of how noise is added (forward process) and the rationale behind focusing on noise quality (reverse process). \\
+
+    \qquad In this paper, we will provide a detailed explanation of the denoise diffusion probability model, including the forward and reverse processes and the loss function used for training.
+    I'm trying to add more details and some further explanation for non-math student like myself based on the famous work "Understanding the denoising diffusion probabilistic model".
+    I hope this paper can help anyone with only basic probability, statistics and ML knoledges understand the denoise diffusion probability model better.
+    Out of the paper, I strongly recommend the original paper 'Understanding the denoising diffusion probabilistic model'(Calvin Luo, 2022) and 'Denoise diffusion probability models' (Ho et al., 2020) for more details.
+
+\begin{figure*}[ht]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \begin{algorithm}[H]
+            % Requires \usepackage{setspace} in the preamble
+            \setstretch{0.9}
+            \caption{Training}
+            \begin{algorithmic}[1]
+                \REPEAT
+                    \STATE $x_{0} \sim q(x_{0})$
+                    \STATE $t \sim \text{Uniform}(\{1, \ldots, T\})$
+                    \STATE $\epsilon \sim \mathcal{N}(0, I)$
+                    \STATE Take gradient descent step on \\
+                    \quad $\nabla_{\theta} \|\epsilon - \epsilon_{\theta}(\sqrt{\bar{\alpha}_{t}}x_{0} + \sqrt{1 - \bar{\alpha}_{t}}\epsilon, t)\|^{2}$
+                \UNTIL{converged}
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \begin{algorithm}[H]
+            \caption{Sampling}
+            \begin{algorithmic}[1]
+                \STATE $x_{T} \sim \mathcal{N}(0, I)$
+                \FOR{$t = T, \ldots, 1$}
+                    \STATE $z \sim \mathcal{N}(0, I)$ if{$t > 1$} else $z = 0$
+                    \STATE $x_{t-1} = \frac{1}{\sqrt{\alpha_{t}}}\left(x_{t} - \frac{1 - \alpha_{t}}{\sqrt{1 - \bar{\alpha}_{t}}}\epsilon_{\theta}(x_{t}, t)\right) + \sigma_{t} z$
+                \ENDFOR
+                \RETURN $x_{0}$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+\end{figure*}
+
+\subsection*{I Forward Process(Sampling)}
+
+\begin{flushleft}
+    The forward process of the denoise diffusion probability model is a process of adding noises to the input image, where the original image and the noised image are linearly dependant. 
+    The original paper of DDPM used a piece of elegant but abstract pseudo code to show the sampling process for any timestamp t (Algorithm 2). 
+    And we try to find out why the writers could write out the sampling algorithm in the original paper by finishing this part.
+\end{flushleft}
+
+\begin{proof}[\textit{Pf:}]
+    \allowdisplaybreaks
+    \begin{align}
+        &\text{Let } \mathbf{x}_0 \text{  be the original image.} \notag \\
+        &\text{Then } \mathbf{x}_{t-1} \to \mathbf{x}_t \text{ is a process of adding noises to the input image, where } \notag \\
+        &\mathbf{x}_{t-1}, \mathbf{x}_t \text{ are linearly dependant.} \notag \\
+        &\qquad\quad \text{Let } \mathbf{x}_t = a_t \mathbf{x}_{t-1} + b_t\varepsilon _t \text{ where } a_t, b_t
+        \text{ are constant and the added noise } \varepsilon _t \sim \mathcal{N}(0, \mathbf{I}). \tag{1} \\
+        &\text{Hence we added noises} \notag \\
+        &\implies \mathbf{x}_{t-1} \text{ has more information than } \mathbf{x}_t \notag \\
+        &\implies a_t, b_t \text{ are attenuation coefficients. } \notag \\
+        &\implies a_t, b_t \in (0,1) \notag \\
+        &\text{Then } \mathbf{x}_t = a_t \mathbf{x}_{t-1} + b_t \varepsilon _t \notag \\
+        &\quad\quad\quad\,\,\, = a_t(a_{t-1} \mathbf{x}_{t-2} + b_{t-1} \varepsilon _{t-1}) + b_t \varepsilon _t \notag \\
+        &\quad\quad\quad\,\,\, = a_t a_{t-1} \mathbf{x}_{t-2} + a_t b_{t-1} \varepsilon _{t-1} + b_t \varepsilon _t \notag \\
+        &\quad\quad\quad\,\,\, = (a_t \cdots a_1)\mathbf{x}_{0} + (a_t \cdots a_2)b_1 \varepsilon _1 
+        + (a_t \cdots a_3)b_2 \varepsilon _2 + \cdots + a_t b_{t-1} \varepsilon _{t-1} + b_t \varepsilon _t \tag{2} \\
+        &\text{while each term of the } b_i \varepsilon _i \text{ is independent normal noise.} \notag \\
+        &\text{Considering the superposition of Normal distribution } \notag \\
+        &\text{Then } \mathbf{x}_t = (a_t \cdots a_1)\mathbf{x}_0 + \sqrt{(a_t \cdots a_2)b_1^2 + (a_t \cdots a_3)b_2^2 + \cdots + a_t^2b_{t-1}^2 + b_t^2} \cdot  \overline{\varepsilon _t} \tag{3} \\
+        &\text{Noticing that we can sum up the square of the coefficients} \notag\\
+        &\text{Then }(a_{t}\cdots a_{1})^{2}+(a_{t}\cdots a_{2})^{2}b_{1}^{2}+(a_{t}\cdots a_{2})^{2}b_{2}^{2}+\cdots+a_{t}^{2}b_{t-1}^{2}+b_{t}^{2} \notag \\
+        &\quad\quad\, =(a_{1}\cdots a_{2})^{2}a_{1}^{2} +(a_{t}\cdots a_{2})^{2}b_{1}^{2}+(a_{t}\cdots a_{2})^{2}b_{2}^{2}+\cdots+a_{t}^{2}b_{t-1}^{2}+b_{t}^{2} \notag \\
+        &\quad\quad\,=(a_{t}\cdots a_{2})^{2}(a_{1}^{2}+b_{1}^{2})+(a_{1}\cdots a_{2})^{2}b_{2}^{2}+\cdots+a_{t}^{2}b_{t-1}^{2}+b_{t}^{2} \notag \\
+        &\quad\quad\,=(a_{t}\cdots a_{3})^{2}(a_{t}^{2}(a_{1}^{2}a_{1}^{2})+b_{2}^{2})+\cdots+a_{t}^{2}b_{t-1}^{2}+b_{t}^{2} \notag \\
+        &\quad\quad\,=\cdots \notag \\
+        &\quad\quad\,=a_{t}^{2}(a_{t-1}^{2}(\cdots(a_{2}^{2}(a_{1}^{2}+b_{1}^{2})+b_{2}^{2})+\cdots b_{t-1}^{2})_)+b_{t}^{2} \tag{4} \\
+        &\text{Introduce a costraint } a^2 + b ^ 2 = 1,\, s.t.\, (4) = 1 \notag \\
+        &\text{let }\overline a_{t}=(a_{t}\cdots a_{1})^{2}, \notag\\
+        &\text{Then } (3) \implies \mathbf{x}_t = \sqrt{\overline{a_{t}}}\mathbf{x}_0 + \sqrt{1-\overline{a_{t}}}\,\overline{\varepsilon_t} ,\, \overline{\varepsilon _t} \sim  \mathcal{N}(0, \mathbf{I}) \tag{5} \\
+        &(1),(5)\implies \mathbf{x}_t = \sqrt{a_{t}}\mathbf{x}_{t-1} + \sqrt{1-a_{t}}\,\varepsilon_t ,\, \varepsilon _t \sim  \mathcal{N}(0, \mathbf{I}) \tag{6} \\
+        &\qquad \text{wrt. }\mathcal{N}(0, \mathbf{I})\text{ could be seen as a standard normal distribution} \notag \\
+        &\implies \lim _{t\to \infty} a_t = 0 \notag \\
+        &\text{So the original writer, Ho use } 1 - a_t \text{ in the second term of (6)}\footnote{} \notag \\
+        &\text{to make sure that variance is on the same scale for variance-preserving.} \notag \\
+        &\text{Noticing that the process can be regarded as sampling from a Gaussian distribution,} \notag \\
+        &\text{wrt. the Reparameterization Trick} \footnote{} \notag \\
+        &\text{Now we can write out the complete foward noising process from (6):}\footnote{} \notag \\
+        &\qquad \mathbf{x}_t \sim q(\mathbf{x}_t|\mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_{t}; \sqrt{\alpha _t}\mathbf{x}_{t-1}, (1-\alpha _t)\mathbf{I}) \tag{7} \\
+        &\qquad \text{wrt. } a_t \text{ is not a param that can be learnt by a DNN, and } \overline {\alpha _t} = 1 - \beta _t \notag \\
+        &(5)\implies \mathbf{x}_t \sim q(\mathbf{x}_t|\mathbf{x}_{0}) = \mathcal{N}(\mathbf{x}_{t}; \sqrt{\alpha _t}\mathbf{x}_{0}, (1-\alpha _t)\mathbf{I}),\, \overline{\alpha _t} = \prod_{s=1}^{t} \alpha _s \tag{8} \\
+        &\text{Then the forward process is a posterior estimation based on joint probability density and} \notag\\
+        &\text{the Markov chain properties: } \notag\\
+        &\qquad q(\mathbf{x}_{1:T}|\mathbf{x}_{0}) = \prod_{t = 1}^{T} q(\mathbf{x}_t|\mathbf{x}_{t-1}) \tag{9}
+    \end{align}
+\end{proof}
+
+\begin{itemize}
+    \item \textit{Notes for part I:}
+    \item \textit{1:} The original writer, Ho use $1 - a_t$ in the second term of (6) to make sure that variance is on the same scale for variance-preserving.
+    \item \textit{2:} The reparameterization trick is a technique used to enable gradient-based optimization of models with stochastic components. By expressing a random variable as a deterministic function of another random variable with a fixed distribution, it allows the gradients to be backpropagated through the stochastic nodes. This is particularly useful in variational autoencoders (VAEs) and other models where sampling from a distribution is required during training.
+    \item \textit{3:} in $\mathcal{N}(\mathbf{x}_{t}; \sqrt{\alpha _t}\mathbf{x}_{t-1}, (1-\alpha _t)\mathbf{I})$ the first term before ';' is the random variance, the second is the mean and the third term is the variance.
+\end{itemize}
+
+\subsection*{II Reverse Process(Training)}
+\begin{flushleft}
+    The reverse process of the denoise diffusion probability model is a process of removing noises from the noised image, where the noised image and the denoised image are linearly dependant. And we need to find a loss function for the training of the reverse process in this part (Algorithm 1).
+\end{flushleft}
+
+\begin{proof}[\textit{Pf:}]
+    \allowdisplaybreaks
+    \begin{align}
+        &\text{In this section, we are trying to find why the loss function used to traing the model is:} \notag \\
+        &\qquad L_{simple}(\theta):= \mathbb{E}_{\mathbf{x}_0,\epsilon} \left[ \frac{\beta^2}{2\sigma_{q(t)}^2\alpha_t(1-\overline{\alpha}_t)} 
+        \left\lVert \epsilon - \epsilon_{\theta}(\sqrt{\overline{\alpha}_t}\mathbf{x}_0 + \sqrt{1 - \overline{\alpha}_t}\epsilon) \right\rVert^2 \right] \tag{10}\\
+        &\text{At the very beginning, I would like to mention the VAE, which is the foundation of DDPM.} \notag \\
+        &\text{Let's define the encoder and decoder are： } x \to z,\,z \to x \text{ , respectively.} \notag \\
+        &\text{Then the encoder can be expressed by: }q(z | x) \text{and decoder: } p(x | z) \notag \\
+        &\text{where }q(z) \text{ is the prior distribution} \notag \\
+        &\text{If you have read the original paper of DDPM, you will find the two models are very similar} \notag \\
+        &\text{So we need to find out how DDPM made these Markov process more complex and powerful.} \notag \\
+        &\text{The DDPM can be regarded as a HAE(Hierarchical Variational Autoencoder). And a HAE} \notag \\
+        &\text{devides the en- and decoder into T steps s.t.} \notag \\
+        &\text{encode proces: } \mathbf{x}_0 \to \mathbf{x}_1 \to \mathbf{x}_2 \to \dots \to \mathbf{x}_T \text{ and decode proces: } \mathbf{x}_T \to \mathbf{x}_{T-1} \to \dots \to \mathbf{x}_1 \to \mathbf{x}_0 \notag \\
+        &\text{We can wirte these processes in a format that is similar to VAE:} \notag \\
+        &\text{encode proces: } q(\mathbf{x}_{1:T}|\mathbf{x}_0) = \prod_{t=1}^{T} q(\mathbf{x}_t|\mathbf{x}_{t-1}) \text{ and decode proces: } p(\mathbf{x}_{0:T}|\mathbf{x}_T) = \prod_{t=1}^{T} p(\mathbf{x}_t|\mathbf{x}_{t-1}) \notag \\
+        &\text{As we see, this change actually are trying to approximating a curve with a series of linear } \notag \\
+        &\text{functions. So the model is more powerful.} \notag \\
+        &\text{Considering that both HAE and VAE are likelihood-based models, with the target: } \notag \\
+        &\qquad\qquad \mathop{\arg\min}\limits_{\mathbf{x}_0} p_{\theta}(\mathbf{x}_0) \text{ ,where }\theta \text{ is a neural network.} \notag \\
+        &\text{Propaedeutics: } \notag \\
+        &\qquad\qquad \text{Every steps of reverse process: }p_{\theta}(\mathbf{x}_{t-1}) \text{ is similar to the forward one;} \notag \\
+        &\qquad\qquad \text{The linear relationship between steps can be modeled as: } \notag \\
+        &\qquad\qquad p_{\theta}(\mathbf{x}_{t-1} | \mathbf{x}_t = \mathcal{N}(\mathbf{x}_{t-1}; \mu_{\theta}(\mathbf{x}_t,t), \sigma_{\theta}(\mathbf{x}_t,t)) \notag \\
+        &\qquad\qquad \text{Then the whole process can be written as a joint probability： } \notag \\
+        &\qquad\qquad p_{\theta}(\mathbf{x}_{0:T}) = p_{\theta}(\mathbf{x}_T) \prod_{t=1}^{T} p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t) \notag \\
+        &\text{Based on the complete probability formular, we can write out the likelihood function of } p_{\theta}(\mathbf{x}_{0:T}) \notag \\
+        &\log p_{\theta}(\mathbf{x}_{0})=\log \int p_{\theta}(\mathbf{x}_0 , \mathbf{x}_1 , \mathbf{x}_2 , \dots , \mathbf{x}_T) \,d\mathbf{x}_0 d\mathbf{x}_1d \dots d\mathbf{x}_T \notag \\ 
+        &\qquad\qquad\,\, = \log \int p_{\theta}(\mathbf{x}_{0:T})\, d\mathbf{x}_{1:T} \notag \\
+        &\qquad\qquad\,\, = \log \int \frac{p_{\theta}(\mathbf{x}_{0:T})q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)} \, d\mathbf{x}_{1:T} \notag \\
+        &\qquad\qquad\,\, = \log \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\frac{p_{\theta}(\mathbf{x}_{0:T})}{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\right] \notag \\
+        &\qquad\qquad\,\, \geq \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p_{\theta}(\mathbf{x}_{0:T})}{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T) \prod_{t=1}^{T}p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{\prod_{t=1}^{T} q_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t-1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \prod_{t=2}^{T}p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_{T-1})\prod_{t=1}^{T-1} q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1)}{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_{T-1})} \right] + \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \prod_{t=1}^{T-1} \frac{p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t+1})}{q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)} \left[ \log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right] + 
+        \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)}{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_{T-1})} \right]
+         + \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)} \left[\sum_{t=1}^{T-1}  \log \frac{p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t+1})}{q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)} \left[ \log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right] + 
+        \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)}{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_{T-1})} \right]
+         + \sum_{t=1}^{T-1} \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)} \left[\log \frac{p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t+1})}{q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_1|\mathbf{x}_0)} \left[ \log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right] + 
+        \mathbb{E}_{q_{\theta}(\mathbf{x}_{T-1}, \mathbf{x}_{T} |\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)}{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_{T-1})} \right]
+         + \sum_{t=1}^{T-1} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t-1}, \mathbf{x}_{t}, \mathbf{x}_{t+1}|\mathbf{x}_0)} \left[\log \frac{p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t+1})}{q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_1|\mathbf{x}_0)} \left[ \log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right] - 
+        \mathbb{E}_{q_{\theta}(\mathbf{x}_{T-1} |\mathbf{x}_0)} \mathbb{E}_{q_{\theta}(\mathbf{x}_{T} |\mathbf{x}_0)}\left[\log \frac{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_{T-1})}{p(\mathbf{x}_T)} \right] \notag \\
+        &\qquad\qquad\quad - \sum_{t=1}^{T-1} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t-1}, \mathbf{x}_{t+1}| \mathbf{x}_{0})} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t}| \mathbf{x}_{t-1}, \mathbf{x}_{t+1}, \mathbf{x}_0)} \left[\log \frac{q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})}{p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t+1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_1|\mathbf{x}_0)} \left[ \log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right] - 
+        \mathbb{E}_{q_{\theta}(\mathbf{x}_{T-1} |\mathbf{x}_0)} \mathbb{E}_{q_{\theta}(\mathbf{x}_{T} |\mathbf{x}_0)}\left[\log \frac{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_{T-1})}{p(\mathbf{x}_T)} \right] \notag \\
+        &\qquad\qquad\quad - \sum_{t=1}^{T-1} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t-1}, \mathbf{x}_{t+1}| \mathbf{x}_{0})} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t}| \mathbf{x}_{t-1})} \left[\log \frac{q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})}{p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t+1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_1|\mathbf{x}_0)} \left[ \log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right] -
+        \mathbb{E}_{q_{\theta}(\mathbf{x}_{T-1} |\mathbf{x}_0)} \left[ D_{KL}(q_{\theta}(\mathbf{x}_{T}| \mathbf{x}_{T-1})\, || \,p(\mathbf{x}_T)) \right] \notag \\
+        &\qquad\qquad\quad - \sum_{t=1}^{T-1} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t-1}, \mathbf{x}_{t+1}| \mathbf{x}_{0})} \left[ D_{KL} (q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})\,||\,p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t+1})) \right] \tag{11} \\
+        &\text{where the first term is the reconstruction term, the second term is the prior matching term,} \notag \\
+        &\text{and the third is the consistency term.} \footnote{} \notag \\
+        &\text{Then we can solve } \mathop{\arg\min}\limits_{\theta} p_{\theta}(\mathbf{x}) \text{ by Monte-Carlo simulation} \notag \\
+        &\text{However, the last term we got is: }  \sum_{t=1}^{T-1} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t-1}, \mathbf{x}_{t+1}| \mathbf{x}_{0})} \left[ D_{KL} (q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})\,||\,p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t+1})) \right] \notag \\
+        &\qquad\text{where both p and q will increase the variance.} \notag \\
+        &\text{Please call back that we will train a DNN to process from } \mathbf{x}_{t+1} \to \mathbf{x}_{t} \notag \\
+        &\text{And } \mathbf{x}_0 \text{ is constant because it's the input image.} \notag \\
+        &\text{Following the principle of the Markov chain, we can re-write equation(10):} \notag \\
+        &\log p_{\theta}(\mathbf{x}_0) \geq \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T} |\mathbf{x}_0)}\left[ \log \frac{p_{\theta}(\mathbf{x}_{0:T})}{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T) \prod_{t=1}^{T}p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{\prod_{t=1}^{T} q_{\theta}(\mathbf{x}_{t}|\mathbf{x}_{t-1})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \prod_{t=2}^{T}p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_{0})\prod_{t=2}^{T} q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1})} \right] \notag \\
+        &\text{There we use a trick based on Markov chain: } q(\mathbf{x}_t | \mathbf{x}_{t-1}, \mathbf{x}_0) = \frac{q(\mathbf{x}_{t-1} | \mathbf{x}_{t}, \mathbf{x}_0)q(\mathbf{x}_{t}|\mathbf{x}_0)}{q(\mathbf{x}_{t-1}|\mathbf{x}_0)} \tag{12} \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \prod_{t=2}^{T}p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_{0})\prod_{t=2}^{T} q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1}, \mathbf{x}_0)} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1)}{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_{0})} + \log \prod_{t=2}^{T} \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{q_{\theta}(\mathbf{x}_t|\mathbf{x}_{t-1}, \mathbf{x}_0)} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1)}{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_{0})} + \log \prod_{t=2}^{T} \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{\frac{q_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0)q_{\theta}(\mathbf{x}_t | \mathbf{x}_0)}{q_{\theta}(\mathbf{x}_{t-1} | \mathbf{x}_0)}} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1)}{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_{0})} + \log \prod_{t=2}^{T} \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_0)}{p_{\theta}(\mathbf{x}_{t}|\mathbf{x}_0)} + \log \prod_{t=2}^{T} \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1)}{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_{0})} 
+        + \log \frac{p_{\theta}(\mathbf{x}_{1}|\mathbf{x}_0)}{p_{\theta}(\mathbf{x}_{2}|\mathbf{x}_0)} \frac{p_{\theta}(\mathbf{x}_{2}|\mathbf{x}_0)}{p_{\theta}(\mathbf{x}_{3}|\mathbf{x}_0)} \dots \frac{p_{\theta}(\mathbf{x}_{T-1}|\mathbf{x}_0)}{p_{\theta}(\mathbf{x}_{T}|\mathbf{x}_0)}
+        + \log \prod_{t=2}^{T} \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1)}{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_{0})} 
+        + \log \frac{p_{\theta}(\mathbf{x}_{1}|\mathbf{x}_0)}{p_{\theta}(\mathbf{x}_{T}|\mathbf{x}_0)}
+        + \log \prod_{t=2}^{T} \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log \frac{p(\mathbf{x}_T)p_{\theta}(\mathbf{x}_0|\mathbf{x}_1)}{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_{0})} 
+        + \sum_{t = 2}^{T} \log \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[\log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right]
+        + \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[ \log \frac{p(\mathbf{x}_{T})}{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_0)} \right]
+        + \sum_{t = 2}^{T} \mathbb{E}_{q_{\theta}(\mathbf{x}_{1:T}|\mathbf{x}_0)}\left[ \log \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{q_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_0)}\left[\log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right]
+        + \mathbb{E}_{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_0)}\left[ \log \frac{p(\mathbf{x}_{T})}{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_0)} \right]
+        + \sum_{t = 2}^{T} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t}, \mathbf{x}_{t-1}|\mathbf{x}_0)}\left[ \log \frac{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t)}{q_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_{1}|\mathbf{x}_0)} \left[\log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1)
+        - \mathbb{E}_{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_0)} \log \frac{q_{\theta}(\mathbf{x}_{T}|\mathbf{x}_0)}{p(\mathbf{x}_{T})} \right]
+        - \sum_{t = 2}^{T} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t}|\mathbf{x}_0)} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t-1}| \mathbf{x}_{t},\mathbf{x}_0)}\left[ \log \frac{q_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_{t}, \mathbf{x}_0)}{p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_{t})} \right] \notag \\
+        &\qquad\qquad\,\, = \mathbb{E}_{q_{\theta}(\mathbf{x}_1|\mathbf{x}_0)} \left[ \log p_{\theta}(\mathbf{x}_0|\mathbf{x}_1) \right]
+        - D_{KL}(q_{\theta}(\mathbf{x}_{T}| \mathbf{x}_{0})\, || \,p(\mathbf{x}_T))
+        - \sum_{t = 2}^{T} \mathbb{E}_{q_{\theta}(\mathbf{x}_{t}|\mathbf{x}_0)} \left[D_{KL}(q_{\theta}(\mathbf{x}_{t-1}| \mathbf{x}_{t},\mathbf{x}_{0})\, || \,p(\mathbf{x}_{t-1} | \mathbf{x}_{t}))\right] \tag{13} \\
+        &\text{Then the denoising matching term(the third one) becomes 'Contrast Denoising', minimizing the loss of } \notag \\
+        &\qquad \text{real and estimated process from adding noise to removing noise.} \notag \\
+        &\text{Then we only need to model }q_{\theta}(\mathbf{x}_{t-1}| \mathbf{x}_{t},\mathbf{x}_{0}) \text{ and } p(\mathbf{x}_{t-1} | \mathbf{x}_{t}) \text{ to solve their }D_{KL}\text{.} \notag \\
+        &\text{Note that our goal is to construct a simple pdf, for example, a Gaussian pdf.} \notag \\
+        &q(\mathbf{x}_{t-1} | \mathbf{x}_{t}, \mathbf{x}_0) = \frac{q(\mathbf{x}_{t} | \mathbf{x}_{t-1}, \mathbf{x}_0)q(\mathbf{x}_{t-1}|\mathbf{x}_0)}{q(\mathbf{x}_{t}|\mathbf{x}_0)} \notag \\
+        &\qquad\qquad\quad\,\,\,\,\, = \frac{q(\mathbf{x}_{t} | \mathbf{x}_{t-1})q(\mathbf{x}_{t-1}|\mathbf{x}_0)}{q(\mathbf{x}_{t}|\mathbf{x}_0)} \notag \\
+        &\qquad\qquad\quad\,\,\,\,\, = \frac{\mathcal{N}(\mathbf{x}_t;\sqrt{\alpha_t}\mathbf{x}_{t-1}, (1-\alpha_t)\mathbf{I})\mathcal{N}(\mathbf{x}_{t-1};\sqrt{\overline{\alpha}_{t-1}}\mathbf{x}_{0}, (1-\overline{\alpha}_{t-1})\mathbf{I})}
+            {\mathcal{N}(\mathbf{x}_t;\sqrt{\overline{\alpha}_{t}}\mathbf{x}_{0}, (1-\overline{\alpha_{t}})\mathbf{I})} \notag \\
+        &\qquad\qquad\quad\,\,\,\,\, \varpropto exp\left\{ -\left[ \frac{(\mathbf{x}_t-\sqrt{\alpha_t}\mathbf{x}_{t-1})^2}{2(1-\alpha_t)}
+        + \frac{(\mathbf{x}_{t-1}-\sqrt{\overline{\alpha}_{t-1}}\mathbf{x}_{0})^2}{2(1-\overline{\alpha}_{t-1})}
+        - \frac{(\mathbf{x}_t-\sqrt{\overline{\alpha}_t}\mathbf{x}_{0})^2}{2(1-\overline{\alpha}_t)} \right] \right\} \notag \\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2}\left[ \frac{-2\sqrt{\alpha_t}\mathbf{x}_t\mathbf{x}_{t-1} + \alpha_t\mathbf{x}_t^2}{(1-\alpha_t)}
+        + \frac{-2\sqrt{\overline{\alpha}_{t-1}}\mathbf{x}_{t-1}\mathbf{x}_{0} + \mathbf{x}_{t-1}^2}{(1-\overline{\alpha}_{t-1})}
+        + C(\mathbf{x}_t, \mathbf{x}_0) \right] \right\} \tag{C is a constant function} \\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2}\left[ - \frac{2\sqrt{\alpha_t}\mathbf{x}_t\mathbf{x}_{t-1}}{(1-\alpha_t)}
+        + \frac{\alpha_t\mathbf{x}_t^2}{(1-\alpha_t)}
+        - \frac{2\sqrt{\overline{\alpha}_{t-1}}\mathbf{x}_{t-1}\mathbf{x}_{0}}{(1-\overline{\alpha}_{t-1})}
+        + \frac {\mathbf{x}_{t-1}^2}{(1-\overline{\alpha}_{t-1})}
+        + C(\mathbf{x}_t, \mathbf{x}_0) \right] \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2}\left[ (\frac{\alpha_t}{1-\alpha_t} + \frac{1}{1-\overline{\alpha}_{t-1}}) \mathbf{x}_{t-1}^2
+        - 2(\frac{\sqrt{\alpha_{t}}\mathbf{x}_{t}}{1-\alpha_{t}} + \frac{\sqrt{\overline{\alpha}_{t-1}}\mathbf{x}_{0}}{1-\overline{\alpha}_{t-1}})\mathbf{x}_{t-1}
+        + C(\mathbf{x}_t, \mathbf{x}_0) \right] \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2}\left[ \frac{\alpha_t(1-\overline{\alpha}_{t-1})+1-\alpha_t}{(1-\alpha_t)(1-\overline{\alpha}_{t-1})} \mathbf{x}_{t-1}^2
+        - 2(\frac{\sqrt{\alpha_{t}}\mathbf{x}_{t}}{1-\alpha_{t}} + \frac{\sqrt{\overline{\alpha}_{t-1}}\mathbf{x}_{0}}{1-\overline{\alpha}_{t-1}})\mathbf{x}_{t-1}
+        + C(\mathbf{x}_t, \mathbf{x}_0) \right] \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2}\left[ \frac{\alpha_t - \overline{\alpha}_t+1-\alpha_t}{(1-\alpha_t)(1-\overline{\alpha}_{t-1})} \mathbf{x}_{t-1}^2
+        - 2(\frac{\sqrt{\alpha_{t}}\mathbf{x}_{t}}{1-\alpha_{t}} + \frac{\sqrt{\overline{\alpha}_{t-1}}\mathbf{x}_{0}}{1-\overline{\alpha}_{t-1}})\mathbf{x}_{t-1}
+        + C(\mathbf{x}_t, \mathbf{x}_0) \right] \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2}\left[ \frac{1 - \overline{\alpha}_t}{(1-\alpha_t)(1-\overline{\alpha}_{t-1})} \mathbf{x}_{t-1}^2
+        - 2(\frac{\sqrt{\alpha_{t}}\mathbf{x}_{t}}{1-\alpha_{t}} + \frac{\sqrt{\overline{\alpha}_{t-1}}\mathbf{x}_{0}}{1-\overline{\alpha}_{t-1}})\mathbf{x}_{t-1} \right]
+        - \frac{1}{2} C(\mathbf{x}_t, \mathbf{x}_0) \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2} \frac{1 - \overline{\alpha}_t}{(1-\alpha_t)(1-\overline{\alpha}_{t-1})} \left[ \mathbf{x}_{t-1}^2
+        - 2\frac{\frac{\sqrt{\alpha_{t}}\mathbf{x}_{t}}{1-\alpha_{t}} + \frac{\sqrt{\overline{\alpha}_{t-1}} \mathbf{x}_{0}}{1-\overline{\alpha}_{t-1}}}
+        {\frac{1 - \overline{\alpha}_t}{(1-\alpha_t)(1-\overline{\alpha}_{t-1})}}\mathbf{x}_{t-1} \right]
+        - \frac{1}{2} C(\mathbf{x}_t, \mathbf{x}_0) \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2} \frac{1 - \overline{\alpha}_t}{(1-\alpha_t)(1-\overline{\alpha}_{t-1})} \left[ \mathbf{x}_{t-1}^2
+        - 2\frac{(\frac{\sqrt{\alpha_{t}}\mathbf{x}_{t}}{1-\alpha_{t}} + \frac{\sqrt{\overline{\alpha}_{t-1}} \mathbf{x}_{0}}{1-\overline{\alpha}_{t-1}})(1-\alpha_t)(1-\overline{\alpha}_{t-1})}
+        {1 - \overline{\alpha}_t}\mathbf{x}_{t-1} \right]
+        - \frac{1}{2} C(\mathbf{x}_t, \mathbf{x}_0) \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ -\frac{1}{2} \frac{1}{\frac{(1-\alpha_t)(1-\overline{\alpha}_{t-1})}{1 - \overline{\alpha}_t}} \left[ \mathbf{x}_{t-1}^2
+        - 2\frac{\sqrt{\alpha_{t}}(1-\overline{\alpha}_{t-1})\mathbf{x}_t + \sqrt{\overline{\alpha}_{t-1}}(1-\alpha_t)\mathbf{x}_{0}}
+        {1 - \overline{\alpha}_t}\mathbf{x}_{t-1} \right]
+        - \frac{1}{2} C(\mathbf{x}_t, \mathbf{x}_0) \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, = exp\left\{ 
+            -\frac{(\mathbf{x}_{t-1} - 
+            \frac{\sqrt{\alpha_{t}}(1-\overline{\alpha}_{t-1})\mathbf{x}_t + \sqrt{\overline{\alpha}_{t-1}}(1-\alpha_t)\mathbf{x}_{0}}
+            {1 - \overline{\alpha}_t})^2}
+            {2\frac{(1-\alpha_t)(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t}}
+        \right\} \notag\\
+        &\qquad\qquad\quad\,\,\,\,\, \varpropto \mathcal{N}\left(\mathbf{x}_{t-1}; 
+            \frac{\sqrt{\alpha_{t}}(1-\overline{\alpha}_{t-1})\mathbf{x}_t + \sqrt{\overline{\alpha}_{t-1}}(1-\alpha_t)\mathbf{x}_{0}}{1 - \overline{\alpha}_t}, 
+            \frac{(1-\alpha_t)(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t}\mathbf{I}\right) \tag{14}\\
+        &\text{Congrats! Now we have the posterior distribution of } q(\mathbf{x}_{t-1} | \mathbf{x}_{t}, \mathbf{x}_0) \text{.} \notag \\
+        &\text{Then for all images } \mathbf{x}_{t-1} \text{, have:} \notag\\
+        &\qquad \mathbf{x}_{t-1} \sim q(\mathbf{x}_{t-1} | \mathbf{x}_{t}, \mathbf{x}_0) = \mathcal{N}(\mu_q,\sigma^2_q) \notag \\
+        &\qquad\qquad\qquad\qquad\qquad\quad\, = \mathcal{N}\left(\frac{\sqrt{\alpha_{t}}(1-\overline{\alpha}_{t-1})\mathbf{x}_t + \sqrt{\overline{\alpha}_{t-1}}(1-\alpha_t)\mathbf{x}_{0}}{1 - \overline{\alpha}_t}, 
+        \frac{(1-\alpha_t)(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t}\mathbf{I}\right) \notag \\
+        &\qquad\qquad\qquad\qquad\qquad\quad\, = \mathcal{N}\left(\frac{\sqrt{\alpha_{t}}(1-\overline{\alpha}_{t-1})\mathbf{x}_t}{1 - \overline{\alpha}_t} 
+        + \frac{\sqrt{\overline{\alpha}_{t-1}}(1-\alpha_t)\mathbf{x}_{0}}{1 - \overline{\alpha}_t}, 
+        \frac{1-\overline{\alpha}_{t-1}}{1-\overline{\alpha}_t}\beta_t\mathbf{I}\right) \tag{15} \\
+        &\text{Note that }p_{\theta}(\mathbf{x}_{t-1} | \mathbf{x}_{t}) = \mathcal{N}(\mu_{\theta}, \Sigma_{\theta}) \, \text{ ,where }\theta \text{ is the DNN.} \text{(Both } \mu \text{ and } \Sigma \text{ are vectors(matrices))} \notag \\
+        &\text{Hence, } \mathcal{D}_{KL}(\mathcal{N}(\mathbf{x};\mu_x,\Sigma_x)\, || \,\mathcal{N}(\mathbf{y};\mu_y,\Sigma_y)) \notag \\
+        &\qquad\quad = \frac{1}{2} \left[ \log \frac{|\Sigma_y|}{|\Sigma_x|} + tr(\Sigma_y^{-1}\Sigma_x) + (\mu_y - \mu_x)^T\Sigma_y^{-1}(\mu_y - \mu_x) \right] \tag{16} \\
+        &\footnote{}\text{Then } \arg\min_{\theta} \mathcal{D}_{KL}(q(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0) || q_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_{t-1})) \notag \\
+        &\qquad\quad = \arg\min_{\theta} \mathcal{D}_{KL}(\mathcal{N}(\mathbf{x}_{t-1};\mu_q, \Sigma_{q(t)}) || \mathcal{N}(\mathbf{x}_{t-1}; \mu_{\theta},\Sigma_{q(t)})) \notag \\
+        &\qquad\quad = \arg\min_{\theta} \frac{1}{2} \left[ \log \frac{|\Sigma_{q(t)}|}{|\Sigma_{q(t)}|} + tr(\Sigma_{q(t)}^{-1}\Sigma_{q(t)}) + ( \mu_{\theta} - \mu_{q(t)})^T\Sigma_{q(t)}^{-1}(\mu_{\theta} - \mu_{q}) \right] \notag \\
+        &\qquad\quad = \arg\min_{\theta} \frac{1}{2} \left[ \log 1 -d + d + ( \mu_{\theta} - \mu_{q(t)})^T\Sigma_{q(t)}^{-1}(\mu_{\theta} - \mu_{q}) \right] \notag \\
+        &\qquad\quad = \arg\min_{\theta} \frac{1}{2} \left[ (\mu_{\theta} - \mu_{q(t)})^T\Sigma_{q(t)}^{-1}(\mu_{\theta} - \mu_{q}) \right] \notag \\
+        &\qquad\quad = \arg\min_{\theta} \frac{1}{2} \left[ (\mu_{\theta} - \mu_{q(t)})^T(\sigma_{q(t)}^2\mathbf{I})(\mu_{\theta} - \mu_{q}) \right] \notag \\
+        &\qquad\quad = \arg\min_{\theta} \frac{1}{2\sigma_{q(t)}^2} \left[ \left\lVert  \mu_{\theta} - \mu_{q(t)} \right\rVert ^2_2 \right] \tag{17} \\
+        &\text{Then our task become computing the } \mu_{\theta} \text{ and } \Sigma_{\theta}, \text{ in (15) \& (17)} \notag \\
+        &\text{Note that }\mathbf{x}_0\, \& \,\mathbf{x}_t \text{ are known because they are input image and output inmage, repectively. }\notag \\
+        &\qquad\text{And there exists a function mapping }\mathbf{x}_0 \text{ to } \mathbf{x}_t \text{ (Yeah, the function is actually the DDPM.)} \notag \\
+        &\text{So one considerable method is compute the true }\mu_q \text{ by } (\mathbf{x}_t, t): \notag \\
+        &\qquad \mu_q = \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{1-\overline{\alpha}_t}\mathbf{x}_0 + \frac{\sqrt{\alpha_{t}}(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t}\mathbf{x}_t \tag{18} \\
+        &\text{However, using equation (16), we have a more simple way to compute the }\mu_q \text{.} \notag \\
+        &\text{Let }\mu_{\theta} \,\&\, \mu_q \text{ in the same format. Then calculate } \left\lVert  \mu_{\theta} - \mu_{q(t)} \right\rVert ^2_2  \notag \\
+        &\text{Note that our goal is to reconstruct image } \mathbf{x}_0 \text{ , where } \hat{\mathbf{x}}_0 =  f_{\theta}(\mathbf{x}_t, t) \text{ based on } \mu_{\theta} \notag \\ 
+        &\text{Then we have: } \mu_{\theta} = \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{1-\overline{\alpha}_t}f_{\theta}(\mathbf{x}_t, t) + \frac{\sqrt{\alpha_{t}}(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t}\mathbf{x}_t \tag{19} \\
+        &\text{Now continue our deduction in equation (17): } \notag \\
+        &\qquad\arg\min_{\theta} \mathcal{D}_{KL}(q(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0) || p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_{t-1})) \notag \\
+        &\qquad = \arg\min_{\theta} \frac{1}{2\sigma_{q(t)}^2} \left[ \left\lVert  \mu_{\theta} - \mu_{q(t)} \right\rVert ^2_2 \right] \notag \\
+        &\qquad = \arg\min_{\theta} \frac{1}{2\sigma_{q(t)}^2} \left[ 
+            \left\lVert \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{1-\overline{\alpha}_t}f_{\theta}(\mathbf{x}_t, t) 
+            - \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{1-\overline{\alpha}_t}\mathbf{x}_0 \right\rVert ^2_2\right] \notag \\
+        &\qquad\text{Note that } \beta_t\text{ here follows the difinition }\beta_t=1-\alpha_t \text{ in the paper rather than equation (7)} \notag \\
+        &\qquad = \arg\min_{\theta} \frac{1}{2\sigma_{q(t)}^2} \left[ 
+            \left\lVert \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{1-\overline{\alpha}_t}(f_{\theta}(\mathbf{x}_t, t) 
+            - \mathbf{x}_0) \right\rVert ^2_2\right] \notag \\
+        &\qquad = \arg\min_{\theta} \frac{1}{2\sigma_{q(t)}^2} \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{1-\overline{\alpha}_t}
+            \left[ \left\lVert f_{\theta}(\mathbf{x}_t, t)- \mathbf{x}_0) \right\rVert^2_2 \right] \tag{20} \\
+        &\text{Consider the meaning of our denoising process. we actually change the target function to minimize } \notag \\
+        &\qquad\text{the loss between the real image and the estimated image.} \notag \\
+        &\text{Now we can try to handle equation (13), the Log-Likelihood Estimation}: \log p_{\theta}(\mathbf{x}_0) \notag \\
+        &\text{Firt, with equation(5), we can simplify (18)}: \notag \\
+        &\qquad \mu_q = \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{1-\overline{\alpha}_t}\mathbf{x}_0 + \frac{\sqrt{\alpha_t}(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t}\mathbf{x}_t \notag \\
+        &\qquad\quad\, = \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{1-\overline{\alpha}_t}
+        \frac{\mathbf{x}_t - \sqrt{1 - \overline{\alpha}_t} \epsilon_t}{\sqrt{\overline{\alpha}_t}}
+            + \frac{\sqrt{\alpha_t}(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t}\mathbf{x}_t \notag\\
+        &\qquad\quad\, \text{**}\epsilon_t \text{ is the noise we added by equation (5). Ignore that overline here, plz.} \notag \\
+        &\qquad\quad\, = \left[ \frac{\sqrt{\overline{\alpha}_{t-1}}\beta_t}{(1-\overline{\alpha}_t)\sqrt{\alpha_{t}}} 
+            + \frac{\sqrt{\alpha_t}(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t} \right] \mathbf{x}_t
+            - \frac{\sqrt{\alpha_{t-1}}\beta_t\sqrt{1-\overline{\alpha}_t}}{(1-\overline{\alpha}_t)\sqrt{\overline{\alpha}_t}} \epsilon_t \notag \\
+        &\qquad\quad\, = \left[ \frac{\beta_t}{(1-\overline{\alpha}_t)\sqrt{\alpha_t}}
+            + \frac{\sqrt{\alpha_t}(1-\overline{\alpha}_{t-1})}{1-\overline{\alpha}_t} \right] \mathbf{x}_t
+            - \frac{\beta_t}{\sqrt{1-\overline{\alpha}_t}\sqrt{\overline{\alpha}_{t}}} \epsilon_t \notag \\
+        &\qquad\quad\, = \frac{1-\alpha_t + \alpha_t(1-\overline{\alpha}_{t-1})}{(1-\overline{\alpha}_t)\sqrt{\alpha_t}}\mathbf{x}_t
+            - \frac{1 - \alpha_t}{\sqrt{1-\overline{\alpha}_t}\sqrt{\overline{\alpha}_{t}}} \epsilon_t \notag \\
+        &\qquad\quad\, = \frac{1-\alpha_t + \alpha_t-\overline{\alpha}_t}{(1-\overline{\alpha}_t)\sqrt{\alpha_t}}\mathbf{x}_t
+            - \frac{1 - \alpha_t}{\sqrt{1-\overline{\alpha}_t}\sqrt{\overline{\alpha}_{t}}} \epsilon_t \notag \\
+        &\qquad\quad\, = \frac{1}{\sqrt{\alpha}_t}\mathbf{x}_t 
+        - \frac{1 - \alpha_t}{\sqrt{1-\overline{\alpha}_t}\sqrt{\overline{\alpha}_{t}}} \epsilon_t \tag{21} \\
+        &\text{Congrats! Now we can estimate }\mathbf{x}_0 \text{ from } \mathbf{x}_t \text{ and noise series } \epsilon_t  \notag \\
+        &\text{Note that } \hat{\epsilon}_t = f_{\theta}(\mathbf{x}_t, t) \notag \\
+        &\text{Then we can reconstruct equation (20) into: } \notag \\
+        &\qquad\arg\min_{\theta} \mathcal{D}_{KL}(q(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0) || p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_{t-1})) \notag \\
+        &\qquad = \arg\min_{\theta} \frac{1}{2\sigma_{q(t)}^2} \frac{(1-\alpha_t)^2}{(1-\overline{\alpha}_t)\alpha_t}
+        \left[ \left\lVert f_{\theta}(\mathbf{x}_t, t)- \epsilon_t \right\rVert^2_2 \right] \tag{22} \\
+        &\text{Then we get the same equation with the paper: }  \notag \\
+        &\qquad \mathbb{E}_{\mathbf{x}_0,\epsilon} \left[ \frac{\beta^2}{2\sigma_{q(t)}^2\alpha_t(1-\overline{\alpha}_t)} 
+        \left\lVert \epsilon - \epsilon_{\theta}(\sqrt{\overline{\alpha}_t}\mathbf{x}_0 + \sqrt{1 - \overline{\alpha}_t}\epsilon) \right\rVert^2 \right]  \tag{23} \\
+        &\text{You may notice he difference between (20) and (22):}  \notag \\
+        &\qquad \text{In (20), we directly let the DNN to optimize the loss between }\hat{\mathbf{x}_0} \,\&\, \mathbf{x}_0 \text{.} \notag \\
+        &\qquad \text{Then based on the extra equations we made above, in (22) we let the DNN to optimize the loss} \notag \\
+        &\qquad \text{between the best noise series }\epsilon_t \,\&\, \text{the Gaussian noises }\hat{\epsilon_t} \text{.} \notag \\
+        &\text{Although in a mathematical view, they are both practical, the writers of DDPM find that the } \notag \\
+        &\text{the denoising model is more effective.} \notag \\
+        &\text{THAT'S WHY THE MODEL IS CALLED THE DDPM!} \notag
+    \end{align}
+\end{proof}
+
+\begin{itemize}
+    \item \textit{Notes for part II:}
+    \item \textit{4:} $\mathcal{D}_{KL}$ is the Kullback-Leibler divergence, p and q are the forward and backward process. So as you can spot that these two $D_{KL}$ are used to measure the loss between the two processes.
+    \item \textit{5:} In equation (17), we typically assume that the variances of the forward process (transition from data to noise) and the reverse process (transition from noise to data recovery) are identical. 
+    This assumption is based on the symmetry of the transformations at each time step within the DDPM framework. The assumption of symmetry simplifies the calculation of the Kullback-Leibler (KL) divergence, 
+    as it circumvents the need to deal with the complex differences between the covariance matrices of the two distributions. Although the variances may differ in the actual forward and reverse processes, 
+    this assumption is reasonable within the DDPM framework because it not only simplifies the training and computation of the model but also continues to capture the key characteristics of the data distribution. 
+    In this way, DDPM can effectively learn to recover high-quality data samples from noise while maintaining the coherence and consistency of the generation process.
+\end{itemize}
+
+\renewcommand{\refname}{References}
+\begin{thebibliography}{9}
+    \bibitem{luo2022understanding}
+    C.~Luo,
+    ``Understanding the denoising diffusion probabilistic model,''
+    \textit{arXiv preprint arXiv:2204.00283},
+    2022.
+    
+    \bibitem{ho2020denoising}
+    J.~Ho, C.~Meng, and P.~Abbeel,
+    ``Denoising diffusion probabilistic models,''
+    \textit{Advances in Neural Information Processing Systems 33 (NeurIPS 2020)}, 
+    \url{https://doi.org/10.48550/arXiv.2006.11239}.
+
+    \bibitem{youtube}
+    Hung-Yi Lee.
+    \textit{Diffusion Model 原理剖析}.
+    \url{https://www.youtube.com/watch?v=ifCDXFdeaaM&list=PLJV_el3uVTsNi7PgekEUFsyVllAJXRsP-&index=4}.
+
+    \bibitem{zhihu}
+    撒旦-cc.
+    \textit{一文解释 Diffusion Model (一) DDPM 理论推导}.
+    \url{https://zhuanlan.zhihu.com/p/565901160}.
+\end{thebibliography}
+
+\end{document}
